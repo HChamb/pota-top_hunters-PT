@@ -2,34 +2,35 @@
 <html lang="pt">
 <head>
     <meta charset="UTF-8">
-    <title>Top Hunters Portugal 2026</title>
+    <title>Top Hunters Portugal POTA</title>
     <style>
-        body { font-family: sans-serif; background: #f0f2f5; padding: 20px; }
-        .container { max-width: 600px; margin: auto; background: white; padding: 20px; border-radius: 12px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
-        h1 { color: #005ea2; text-align: center; font-size: 22px; }
-        select { width: 100%; padding: 10px; margin-bottom: 20px; border-radius: 6px; border: 1px solid #ccc; }
-        table { width: 100%; border-collapse: collapse; }
-        th { background: #005ea2; color: white; padding: 10px; text-align: left; }
-        td { padding: 10px; border-bottom: 1px solid #eee; }
-        .callsign { font-weight: bold; color: #d32f2f; font-family: monospace; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f0f2f5; padding: 20px; }
+        .card { max-width: 700px; margin: auto; background: white; padding: 25px; border-radius: 15px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
+        h1 { color: #005ea2; text-align: center; margin-bottom: 20px; }
+        select { width: 100%; padding: 12px; margin-bottom: 20px; border-radius: 8px; border: 1px solid #ccc; font-size: 16px; background: #fff; }
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+        th { background: #005ea2; color: white; padding: 12px; text-align: left; border-radius: 4px 4px 0 0; }
+        td { padding: 12px; border-bottom: 1px solid #eee; }
+        .callsign { font-weight: bold; color: #d32f2f; font-family: 'Courier New', monospace; font-size: 1.1em; }
         .count { font-weight: bold; color: #2e7d32; text-align: right; }
-        .loading { text-align: center; padding: 20px; color: #666; }
+        .loading { text-align: center; padding: 30px; color: #666; font-style: italic; }
+        .error-msg { color: #d32f2f; text-align: center; padding: 20px; font-weight: bold; }
     </style>
 </head>
 <body>
 
-<div class="container">
+<div class="card">
     <h1>🏆 Top Hunters Portugal</h1>
     
-    <select id="ano" onchange="carregar()">
+    <select id="periodo" onchange="carregarDados()">
         <option value="2026">Ano 2026</option>
         <option value="2025">Ano 2025</option>
-        <option value="alltime">Total (All-Time)</option>
+        <option value="all">Histórico Total (All-Time)</option>
     </select>
 
-    <div id="status" class="loading">A obter dados via Cloudflare...</div>
+    <div id="status" class="loading">A obter dados do POTA...</div>
     
-    <table id="tabela" style="display:none">
+    <table id="tabelaHunters" style="display:none">
         <thead>
             <tr>
                 <th>#</th>
@@ -37,45 +38,56 @@
                 <th style="text-align:right;">Parques</th>
             </tr>
         </thead>
-        <tbody id="lista"></tbody>
+        <tbody id="corpoTabela"></tbody>
     </table>
 </div>
 
 <script>
-    // O teu link do Worker que já está a funcionar!
+    // O teu Worker que já confirmamos estar ativo!
     const PROXY = "https://pota-proxy.henrique-chambel.workers.dev/?url=";
 
-    async function carregar() {
-        const ano = document.getElementById('ano').value;
+    async function carregarDados() {
+        const periodo = document.getElementById('periodo').value;
         const status = document.getElementById('status');
-        const lista = document.getElementById('lista');
-        const tabela = document.getElementById('tabela');
+        const tabela = document.getElementById('tabelaHunters');
+        const corpo = document.getElementById('corpoTabela');
 
         status.style.display = 'block';
+        status.className = 'loading';
+        status.innerText = 'A obter dados do POTA...';
         tabela.style.display = 'none';
-        lista.innerHTML = '';
+        corpo.innerHTML = '';
 
-        // IDs: 272 (PT), 273 (Açores), 256 (Madeira)
+        // IDs DXCC: 272 (CT), 273 (CU), 256 (CT3)
         const dxccs = [272, 273, 256];
-        let unificado = [];
+        let huntersUnificados = [];
 
         try {
             for (let id of dxccs) {
-                // Link público que não pede "Authentication Token"
-                const api = ano === 'alltime' 
-                    ? `https://api.pota.app/stats/leagues/hunter?dxcc=${id}`
-                    : `https://api.pota.app/stats/leagues/hunter/${ano}?dxcc=${id}`;
-
-                const r = await fetch(PROXY + encodeURIComponent(api));
-                const d = await r.json();
-                if (Array.isArray(d)) unificado = unificado.concat(d);
+                // Usando o endpoint de LEADERBOARD que é público e não pede Token
+                const urlPota = `https://api.pota.app/leaderboard/hunter/${id}?year=${periodo === 'all' ? '' : periodo}`;
+                
+                const response = await fetch(PROXY + encodeURIComponent(urlPota));
+                const data = await response.json();
+                
+                // A estrutura deste endpoint é um array simples
+                if (Array.isArray(data)) {
+                    huntersUnificados = huntersUnificados.concat(data);
+                }
             }
 
-            // Ordenar por número de parques
-            unificado.sort((a, b) => b.count - a.count);
+            if (huntersUnificados.length === 0) {
+                status.innerText = "Nenhum dado encontrado para este período.";
+                return;
+            }
 
-            unificado.slice(0, 50).forEach((h, i) => {
-                lista.innerHTML += `<tr>
+            // Agrupar se o mesmo indicativo aparecer em regiões diferentes (raro, mas possível)
+            // e ordenar por contagem
+            huntersUnificados.sort((a, b) => b.count - a.count);
+
+            // Mostrar o Top 50
+            huntersUnificados.slice(0, 50).forEach((h, i) => {
+                corpo.innerHTML += `<tr>
                     <td>${i + 1}</td>
                     <td class="callsign">${h.callsign}</td>
                     <td class="count">${h.count.toLocaleString()}</td>
@@ -85,12 +97,15 @@
             status.style.display = 'none';
             tabela.style.display = 'table';
 
-        } catch (e) {
-            status.innerHTML = "Erro ao processar dados. Tenta recarregar.";
+        } catch (err) {
+            status.className = 'error-msg';
+            status.innerText = "Erro ao carregar dados. Verifica a ligação ao Worker.";
+            console.error(err);
         }
     }
 
-    carregar();
+    // Iniciar automaticamente
+    carregarDados();
 </script>
 </body>
 </html>
