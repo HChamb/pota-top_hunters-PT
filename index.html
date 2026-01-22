@@ -4,33 +4,37 @@
     <meta charset="UTF-8">
     <title>Top Hunters POTA Portugal</title>
     <style>
-        body { font-family: sans-serif; padding: 20px; background: #f4f4f4; }
-        .container { max-width: 600px; margin: auto; background: white; padding: 20px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
-        h2 { color: #005ea2; text-align: center; }
-        select { width: 100%; padding: 10px; margin-bottom: 20px; border-radius: 5px; }
-        table { width: 100%; border-collapse: collapse; }
-        th { background: #005ea2; color: white; padding: 10px; text-align: left; }
-        td { padding: 10px; border-bottom: 1px solid #eee; }
-        .call { font-weight: bold; color: #d32f2f; }
-        .count { font-weight: bold; color: #2e7d32; text-align: right; }
+        body { font-family: sans-serif; background: #f4f7f6; padding: 20px; }
+        .card { max-width: 650px; margin: auto; background: white; padding: 25px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
+        h2 { color: #005ea2; text-align: center; border-bottom: 2px solid #eee; padding-bottom: 10px; }
+        select { width: 100%; padding: 12px; margin: 15px 0; border-radius: 6px; border: 1px solid #ccc; font-size: 16px; }
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+        th { background: #005ea2; color: white; padding: 12px; text-align: left; }
+        td { padding: 12px; border-bottom: 1px solid #eee; }
+        .call { font-weight: bold; color: #d32f2f; font-family: monospace; font-size: 1.1em; }
+        .total { font-weight: bold; color: #2e7d32; text-align: right; }
+        .loading { text-align: center; padding: 20px; color: #666; font-style: italic; }
     </style>
 </head>
 <body>
 
-<div class="container">
+<div class="card">
     <h2>🏆 Top Hunters Portugal</h2>
-    <select id="ano" onchange="carregar()">
-        <option value="2026">2026</option>
-        <option value="2025">2025</option>
-        <option value="alltime">All-Time</option>
+    
+    <select id="anoSelect" onchange="carregarDados()">
+        <option value="2026">Ano 2026</option>
+        <option value="2025">Ano 2025</option>
+        <option value="2024">Ano 2024</option>
+        <option value="alltime">Histórico Total (All-Time)</option>
     </select>
 
-    <div id="status" style="text-align:center;">A carregar...</div>
-    <table id="tabela" style="display:none;">
+    <div id="status" class="loading">A ligar ao servidor...</div>
+    
+    <table id="tabela" style="display:none">
         <thead>
             <tr>
                 <th>#</th>
-                <th>Callsign</th>
+                <th>Indicativo</th>
                 <th style="text-align:right;">Parques</th>
             </tr>
         </thead>
@@ -39,49 +43,54 @@
 </div>
 
 <script>
-    // SUBSTITUI PELO TEU LINK DO WORKER
-    const PROXY = "https://pota-proxy.teu-nome.workers.dev/?url=";
+    // IMPORTANTE: Substitui pelo teu link do Worker da Cloudflare
+    const MEU_WORKER = "https://pota-proxy.teu-utilizador.workers.dev/?url=";
 
-    async function carregar() {
-        const ano = document.getElementById('ano').value;
-        const lista = document.getElementById('lista');
+    async function carregarDados() {
+        const ano = document.getElementById('anoSelect').value;
         const status = document.getElementById('status');
-        
+        const tabela = document.getElementById('tabela');
+        const lista = document.getElementById('lista');
+
         status.style.display = 'block';
-        document.getElementById('tabela').style.display = 'none';
+        tabela.style.display = 'none';
         lista.innerHTML = '';
 
-        const dxccs = [272, 273, 256];
-        let total = [];
+        const dxccs = [272, 273, 256]; // Portugal, Açores, Madeira
+        let hunters = [];
 
         try {
             for (let id of dxccs) {
-                const api = ano === 'alltime' 
+                const potaApi = ano === 'alltime' 
                     ? `https://api.pota.app/stats/leagues/hunter?dxcc=${id}`
                     : `https://api.pota.app/stats/leagues/hunter/${ano}?dxcc=${id}`;
-                
-                const r = await fetch(PROXY + encodeURIComponent(api));
-                const d = await r.json();
-                total = total.concat(d);
+
+                const response = await fetch(MEU_WORKER + encodeURIComponent(potaApi));
+                const data = await response.json();
+                if (Array.isArray(data)) hunters = hunters.concat(data);
             }
 
-            total.sort((a, b) => b.count - a.count);
+            // Ordenar por maior número de parques
+            hunters.sort((a, b) => b.count - a.count);
 
-            total.slice(0, 20).forEach((h, i) => {
+            // Mostrar Top 30
+            hunters.slice(0, 30).forEach((h, i) => {
                 lista.innerHTML += `<tr>
-                    <td>${i+1}</td>
+                    <td>${i + 1}</td>
                     <td class="call">${h.callsign}</td>
-                    <td class="count">${h.count}</td>
+                    <td class="total">${h.count.toLocaleString()}</td>
                 </tr>`;
             });
 
             status.style.display = 'none';
-            document.getElementById('tabela').style.display = 'table';
+            tabela.style.display = 'table';
+
         } catch (e) {
-            status.innerText = "Erro ao carregar dados.";
+            status.innerHTML = "<b>Erro:</b> O Worker não respondeu. Verifica se o link está correto.";
         }
     }
-    carregar();
+
+    carregarDados();
 </script>
 </body>
 </html>
