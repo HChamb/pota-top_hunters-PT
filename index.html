@@ -1,98 +1,75 @@
-<!DOCTYPE html>
-<html lang="pt">
-<head>
-    <meta charset="UTF-8">
-    <title>Ranking Hunters Portugal</title>
-    <style>
-        body { font-family: sans-serif; background: #f0f2f5; padding: 20px; }
-        .card { max-width: 600px; margin: auto; background: white; padding: 25px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
-        h2 { color: #005ea2; text-align: center; }
-        select { width: 100%; padding: 12px; margin-bottom: 20px; border-radius: 8px; border: 1px solid #ccc; font-size: 16px; }
-        table { width: 100%; border-collapse: collapse; }
-        th { background: #005ea2; color: white; padding: 12px; text-align: left; }
-        td { padding: 12px; border-bottom: 1px solid #eee; }
-        .callsign { font-weight: bold; color: #d32f2f; font-family: monospace; }
-        .count { font-weight: bold; color: #2e7d32; text-align: right; }
-        .loading { text-align: center; padding: 20px; color: #666; font-style: italic; }
-    </style>
-</head>
-<body>
-
-<div class="card">
-    <h2>🏆 Top Hunters Portugal (2025/2026)</h2>
-    
-    <select id="ano" onchange="carregar()">
-        <option value="2025">Ano 2025 (Dados Reais)</option>
-        <option value="2026">Ano 2026 (Início)</option>
-        <option value="">Histórico Total</option>
-    </select>
-
-    <div id="status" class="loading">A ligar ao POTA via Worker...</div>
-    
-    <table id="tabela" style="display:none">
-        <thead>
-            <tr>
-                <th>#</th>
-                <th>Indicativo</th>
-                <th style="text-align:right;">Parques</th>
-            </tr>
-        </thead>
-        <tbody id="lista"></tbody>
-    </table>
-</div>
-
 <script>
-    const PROXY = "https://pota-proxy.henrique-chambel.workers.dev/?url=";
+const PROXY = "https://pota-proxy.henrique-chambel.workers.dev/?url=";
 
-    async function carregar() {
-        const ano = document.getElementById('ano').value;
-        const status = document.getElementById('status');
-        const lista = document.getElementById('lista');
-        const tabela = document.getElementById('tabela');
+// DXCC: CT, CU, CT3
+const DXCCS = [272, 273, 256];
 
-        status.style.display = 'block';
-        tabela.style.display = 'none';
-        lista.innerHTML = '';
+async function carregar() {
+    const ano = document.getElementById('ano').value;
+    const status = document.getElementById('status');
+    const lista = document.getElementById('lista');
+    const tabela = document.getElementById('tabela');
 
-        // IDs DXCC: 272 (CT), 273 (CU), 256 (CT3)
-        const dxccs = [272, 273, 256];
-        let unificado = [];
+    status.style.display = 'block';
+    tabela.style.display = 'none';
+    lista.innerHTML = '';
+    status.innerText = "A carregar dados do POTA...";
 
-        try {
-            for (let id of dxccs) {
-                // Link de Leaderboard que é público
-                const apiURL = `https://api.pota.app/leaderboard/hunter/${id}?year=${ano}`;
-                const response = await fetch(PROXY + encodeURIComponent(apiURL));
-                
-                if (response.ok) {
-                    const data = await response.json();
-                    if (Array.isArray(data)) unificado = unificado.concat(data);
-                }
+    let resultados = [];
+
+    try {
+        for (const id of DXCCS) {
+
+            // Construção correta da URL
+            const apiURL = ano
+                ? `https://api.pota.app/leaderboard/hunter/${id}?year=${ano}`
+                : `https://api.pota.app/leaderboard/hunter/${id}`;
+
+            const response = await fetch(PROXY + encodeURIComponent(apiURL));
+
+            if (!response.ok) {
+                console.warn("Falha no DXCC", id);
+                continue;
             }
 
-            unificado.sort((a, b) => b.count - a.count);
+            const data = await response.json();
+            if (Array.isArray(data)) resultados = resultados.concat(data);
+        }
 
-            if (unificado.length === 0) {
-                status.innerText = "Sem dados. Tenta mudar o ano para 2025.";
-                return;
-            }
+        if (resultados.length === 0) {
+            status.innerText = "Sem dados disponíveis para este ano.";
+            return;
+        }
 
-            unificado.slice(0, 50).forEach((h, i) => {
-                lista.innerHTML += `<tr>
+        // Remover duplicados e somar counts
+        const mapa = new Map();
+        resultados.forEach(h => {
+            if (!mapa.has(h.callsign)) mapa.set(h.callsign, { ...h });
+            else mapa.get(h.callsign).count += h.count;
+        });
+
+        const final = [...mapa.values()].sort((a, b) => b.count - a.count);
+
+        // Construção eficiente do HTML
+        let html = "";
+        final.slice(0, 50).forEach((h, i) => {
+            html += `
+                <tr>
                     <td>${i + 1}</td>
                     <td class="callsign">${h.callsign}</td>
                     <td class="count">${h.count}</td>
                 </tr>`;
-            });
+        });
 
-            status.style.display = 'none';
-            tabela.style.display = 'table';
-        } catch (e) {
-            status.innerHTML = "Erro ao contactar o Worker.";
-        }
+        lista.innerHTML = html;
+        status.style.display = 'none';
+        tabela.style.display = 'table';
+
+    } catch (e) {
+        console.error(e);
+        status.innerText = "Erro ao contactar o Worker ou API.";
     }
+}
 
-    carregar();
+carregar();
 </script>
-</body>
-</html>
