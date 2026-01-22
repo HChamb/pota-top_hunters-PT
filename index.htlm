@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>POTA Top Hunters Portugal</title>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background: #f0f2f5; margin: 0; padding: 20px; color: #1c1e21; }
+        .container { max-width: 800px; margin: auto; background: white; padding: 20px; border-radius: 12px; box-shadow: 0 2px 12px rgba(0,0,0,0.1); }
+        h1 { color: #005ea2; text-align: center; font-size: 24px; border-bottom: 2px solid #eee; padding-bottom: 15px; }
+        .controls { display: flex; justify-content: center; align-items: center; gap: 10px; margin-bottom: 20px; background: #f8f9fa; padding: 15px; border-radius: 8px; }
+        select { padding: 8px 12px; border-radius: 6px; border: 1px solid #ccd0d5; font-size: 16px; cursor: pointer; background: white; }
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; display: none; }
+        th { background: #005ea2; color: white; text-align: left; padding: 12px; font-size: 14px; text-transform: uppercase; }
+        td { padding: 12px; border-bottom: 1px solid #ebedf0; }
+        tr:hover { background-color: #f5f6f7; }
+        .rank { font-weight: bold; color: #65676b; width: 40px; }
+        .callsign { font-weight: bold; color: #d32f2f; font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace; }
+        .region { font-size: 11px; background: #e4e6eb; color: #4b4f56; padding: 2px 6px; border-radius: 4px; margin-left: 8px; vertical-align: middle; }
+        .count { font-weight: bold; color: #2e7d32; text-align: right; }
+        .loading { text-align: center; padding: 40px; color: #65676b; font-style: italic; }
+        .error { color: #ba181b; background: #fff1f0; border: 1px solid #ffccc7; padding: 15px; border-radius: 8px; text-align: center; display: none; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>🏆 Top Hunters Portugal</h1>
+    
+    <div class="controls">
+        <label for="ano">Período:</label>
+        <select id="ano" onchange="fetchAll()">
+            <option value="2026">Ano 2026</option>
+            <option value="2025">Ano 2025</option>
+            <option value="2024">Ano 2024</option>
+            <option value="alltime">All-Time (Total)</option>
+        </select>
+    </div>
+
+    <div id="loader" class="loading">A obter dados da API...</div>
+    <div id="error" class="error"></div>
+
+    <table id="tabela">
+        <thead>
+            <tr>
+                <th>#</th>
+                <th>Indicativo</th>
+                <th>Nome</th>
+                <th style="text-align:right;">Parques</th>
+            </tr>
+        </thead>
+        <tbody id="lista"></tbody>
+    </table>
+</div>
+
+<script>
+    const DXCC_MAP = [
+        { id: 272, label: 'CT' },  // Portugal
+        { id: 273, label: 'CU' },  // Açores
+        { id: 256, label: 'CT3' }  // Madeira
+    ];
+
+    async function fetchAll() {
+        const ano = document.getElementById('ano').value;
+        const loader = document.getElementById('loader');
+        const tabela = document.getElementById('tabela');
+        const lista = document.getElementById('lista');
+        const errorDiv = document.getElementById('error');
+
+        loader.style.display = 'block';
+        tabela.style.display = 'none';
+        errorDiv.style.display = 'none';
+        lista.innerHTML = '';
+
+        let totalHunters = [];
+
+        try {
+            for (const dxcc of DXCC_MAP) {
+                const endpoint = ano === 'alltime' 
+                    ? `https://api.pota.app/stats/leagues/hunter?dxcc=${dxcc.id}`
+                    : `https://api.pota.app/stats/leagues/hunter/${ano}?dxcc=${dxcc.id}`;
+                
+                // Usamos o AllOrigins para evitar o erro de CORS
+                const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(endpoint)}`;
+                
+                const response = await fetch(proxyUrl);
+                const json = await response.json();
+                const data = JSON.parse(json.contents);
+
+                if (Array.isArray(data)) {
+                    data.forEach(h => totalHunters.push({ ...h, prefix: dxcc.label }));
+                }
+            }
+
+            // Ordenar por parques caçados
+            totalHunters.sort((a, b) => b.count - a.count);
+
+            if (totalHunters.length === 0) throw new Error("Sem dados.");
+
+            totalHunters.slice(0, 50).forEach((h, i) => {
+                lista.innerHTML += `<tr>
+                    <td class="rank">${i + 1}</td>
+                    <td><span class="callsign">${h.callsign}</span><span class="region">${h.prefix}</span></td>
+                    <td style="font-size: 0.9em; color: #65676b;">${h.name || ''}</td>
+                    <td class="count">${h.count.toLocaleString()}</td>
+                </tr>`;
+            });
+
+            loader.style.display = 'none';
+            tabela.style.display = 'table';
+
+        } catch (err) {
+            loader.style.display = 'none';
+            errorDiv.innerText = "Erro ao carregar dados. A API do POTA pode estar em manutenção.";
+            errorDiv.style.display = 'block';
+        }
+    }
+
+    fetchAll();
+</script>
+
+</body>
+</html>
