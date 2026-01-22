@@ -2,41 +2,35 @@
 <html lang="pt">
 <head>
     <meta charset="UTF-8">
-    <title>POTA Top Hunters Portugal</title>
+    <title>Top Hunters POTA Portugal</title>
     <style>
-        body { font-family: sans-serif; background: #f0f2f5; padding: 20px; }
-        .container { max-width: 700px; margin: auto; background: white; padding: 25px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
-        h1 { color: #005ea2; border-bottom: 2px solid #eee; padding-bottom: 10px; }
-        .menu { margin-bottom: 20px; padding: 10px; background: #f8f9fa; border-radius: 8px; }
+        body { font-family: sans-serif; padding: 20px; background: #f4f4f4; }
+        .container { max-width: 600px; margin: auto; background: white; padding: 20px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        h2 { color: #005ea2; text-align: center; }
+        select { width: 100%; padding: 10px; margin-bottom: 20px; border-radius: 5px; }
         table { width: 100%; border-collapse: collapse; }
-        th { background: #005ea2; color: white; padding: 12px; text-align: left; }
-        td { padding: 12px; border-bottom: 1px solid #eee; }
-        .callsign { font-weight: bold; color: #d32f2f; font-family: monospace; }
+        th { background: #005ea2; color: white; padding: 10px; text-align: left; }
+        td { padding: 10px; border-bottom: 1px solid #eee; }
+        .call { font-weight: bold; color: #d32f2f; }
         .count { font-weight: bold; color: #2e7d32; text-align: right; }
-        .loading { text-align: center; color: #666; padding: 20px; }
     </style>
 </head>
 <body>
 
 <div class="container">
-    <h1>🏆 Top Hunters Portugal</h1>
-    
-    <div class="menu">
-        <label>Ano: </label>
-        <select id="ano" onchange="carregar()">
-            <option value="2026">2026</option>
-            <option value="2025">2025</option>
-            <option value="alltime">All-Time</option>
-        </select>
-    </div>
+    <h2>🏆 Top Hunters Portugal</h2>
+    <select id="ano" onchange="carregar()">
+        <option value="2026">2026</option>
+        <option value="2025">2025</option>
+        <option value="alltime">All-Time</option>
+    </select>
 
-    <div id="status" class="loading">A ligar diretamente à api.pota.app...</div>
-    
-    <table id="tabela" style="display:none">
+    <div id="status" style="text-align:center;">A carregar...</div>
+    <table id="tabela" style="display:none;">
         <thead>
             <tr>
                 <th>#</th>
-                <th>Indicativo</th>
+                <th>Callsign</th>
                 <th style="text-align:right;">Parques</th>
             </tr>
         </thead>
@@ -45,52 +39,48 @@
 </div>
 
 <script>
+    // SUBSTITUI PELO TEU LINK DO WORKER
+    const PROXY = "https://pota-proxy.teu-nome.workers.dev/?url=";
+
     async function carregar() {
         const ano = document.getElementById('ano').value;
-        const status = document.getElementById('status');
         const lista = document.getElementById('lista');
-        const tabela = document.getElementById('tabela');
-
+        const status = document.getElementById('status');
+        
         status.style.display = 'block';
-        tabela.style.display = 'none';
+        document.getElementById('tabela').style.display = 'none';
         lista.innerHTML = '';
 
-        // IDs DXCC: 272 (PT), 273 (Açores), 256 (Madeira)
         const dxccs = [272, 273, 256];
-        let unificado = [];
+        let total = [];
 
         try {
             for (let id of dxccs) {
-                const endpoint = ano === 'alltime' 
+                const api = ano === 'alltime' 
                     ? `https://api.pota.app/stats/leagues/hunter?dxcc=${id}`
                     : `https://api.pota.app/stats/leagues/hunter/${ano}?dxcc=${id}`;
-
-                // Tentativa de fetch direto (GitHub Pages às vezes tem passes de segurança melhores)
-                const response = await fetch(endpoint);
-                if (!response.ok) throw new Error("Bloqueio de API");
                 
-                const data = await response.json();
-                unificado = unificado.concat(data);
+                const r = await fetch(PROXY + encodeURIComponent(api));
+                const d = await r.json();
+                total = total.concat(d);
             }
 
-            unificado.sort((a, b) => b.count - a.count);
+            total.sort((a, b) => b.count - a.count);
 
-            unificado.slice(0, 50).forEach((h, i) => {
+            total.slice(0, 20).forEach((h, i) => {
                 lista.innerHTML += `<tr>
-                    <td>${i + 1}</td>
-                    <td class="callsign">${h.callsign}</td>
-                    <td class="count">${h.count.toLocaleString()}</td>
+                    <td>${i+1}</td>
+                    <td class="call">${h.callsign}</td>
+                    <td class="count">${h.count}</td>
                 </tr>`;
             });
 
             status.style.display = 'none';
-            tabela.style.display = 'table';
-
-        } catch (err) {
-            status.innerHTML = "<b>Erro de Acesso:</b> A API do POTA bloqueou a ligação direta do browser.<br>";
+            document.getElementById('tabela').style.display = 'table';
+        } catch (e) {
+            status.innerText = "Erro ao carregar dados.";
         }
     }
-
     carregar();
 </script>
 </body>
