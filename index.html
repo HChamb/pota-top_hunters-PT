@@ -1,7 +1,62 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+    <meta charset="UTF-8">
+    <title>Ranking Hunters Portugal</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <style>
+        body { font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: #f0f2f5; padding: 20px; }
+        .card { max-width: 700px; margin: auto; background: white; padding: 25px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
+        h1 { color: #005ea2; text-align: center; margin-bottom: 5px; }
+        h2 { color: #555; text-align: center; font-size: 16px; margin-top: 0; }
+        select { width: 100%; padding: 12px; margin: 20px 0; border-radius: 8px; border: 1px solid #ccc; font-size: 16px; }
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+        th { background: #005ea2; color: white; padding: 10px; text-align: left; font-size: 14px; }
+        td { padding: 10px; border-bottom: 1px solid #eee; font-size: 14px; }
+        .callsign { font-weight: bold; color: #d32f2f; font-family: monospace; }
+        .count { font-weight: bold; color: #2e7d32; text-align: right; }
+        .pos { width: 40px; text-align: right; color: #555; }
+        .loading { text-align: center; padding: 15px; color: #666; font-style: italic; }
+        .footer { margin-top: 20px; font-size: 12px; color: #777; text-align: center; }
+        @media (max-width: 600px) {
+            .card { padding: 15px; }
+            th, td { font-size: 13px; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="card">
+    <h1>🏆 Top Hunters Portugal</h1>
+    <h2>CT · CU · CT3 — POTA Leaderboard</h2>
+    
+    <select id="ano" onchange="carregar()">
+        <option value="2025">Ano 2025 (Dados Reais)</option>
+        <option value="2026">Ano 2026 (Início)</option>
+        <option value="">Histórico Total</option>
+    </select>
+
+    <div id="status" class="loading">A ligar ao POTA via Worker...</div>
+    
+    <table id="tabela" style="display:none">
+        <thead>
+            <tr>
+                <th class="pos">#</th>
+                <th>Indicativo</th>
+                <th style="text-align:right;">Parques</th>
+            </tr>
+        </thead>
+        <tbody id="lista"></tbody>
+    </table>
+
+    <div class="footer">
+        Dados via <strong>POTA API</strong> · Agregado para DXCC 272 (CT), 273 (CU), 256 (CT3).<br>
+        Página estática para GitHub Pages.
+    </div>
+</div>
+
 <script>
 const PROXY = "https://pota-proxy.henrique-chambel.workers.dev/?url=";
-
-// DXCC: CT, CU, CT3
 const DXCCS = [272, 273, 256];
 
 async function carregar() {
@@ -19,57 +74,9 @@ async function carregar() {
 
     try {
         for (const id of DXCCS) {
-
-            // Construção correta da URL
             const apiURL = ano
                 ? `https://api.pota.app/leaderboard/hunter/${id}?year=${ano}`
                 : `https://api.pota.app/leaderboard/hunter/${id}`;
 
             const response = await fetch(PROXY + encodeURIComponent(apiURL));
 
-            if (!response.ok) {
-                console.warn("Falha no DXCC", id);
-                continue;
-            }
-
-            const data = await response.json();
-            if (Array.isArray(data)) resultados = resultados.concat(data);
-        }
-
-        if (resultados.length === 0) {
-            status.innerText = "Sem dados disponíveis para este ano.";
-            return;
-        }
-
-        // Remover duplicados e somar counts
-        const mapa = new Map();
-        resultados.forEach(h => {
-            if (!mapa.has(h.callsign)) mapa.set(h.callsign, { ...h });
-            else mapa.get(h.callsign).count += h.count;
-        });
-
-        const final = [...mapa.values()].sort((a, b) => b.count - a.count);
-
-        // Construção eficiente do HTML
-        let html = "";
-        final.slice(0, 50).forEach((h, i) => {
-            html += `
-                <tr>
-                    <td>${i + 1}</td>
-                    <td class="callsign">${h.callsign}</td>
-                    <td class="count">${h.count}</td>
-                </tr>`;
-        });
-
-        lista.innerHTML = html;
-        status.style.display = 'none';
-        tabela.style.display = 'table';
-
-    } catch (e) {
-        console.error(e);
-        status.innerText = "Erro ao contactar o Worker ou API.";
-    }
-}
-
-carregar();
-</script>
