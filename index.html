@@ -2,7 +2,7 @@
 <html lang="pt">
 <head>
     <meta charset="UTF-8">
-    <title>Ranking Hunters Portugal</title>
+    <title>Top Hunters Portugal — POTA Leaderboard</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <style>
         body { font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: #f0f2f5; padding: 20px; }
@@ -79,4 +79,45 @@ async function carregar() {
                 : `https://api.pota.app/leaderboard/hunter/${id}`;
 
             const response = await fetch(PROXY + encodeURIComponent(apiURL));
+            const data = await response.json();
 
+            if (Array.isArray(data)) {
+                resultados = resultados.concat(data);
+            }
+        }
+
+        // Agregação por indicativo
+        const mapa = new Map();
+        for (const entrada of resultados) {
+            const { callsign, count } = entrada;
+            mapa.set(callsign, (mapa.get(callsign) || 0) + count);
+        }
+
+        // Ordenar por número de parques
+        const ordenado = Array.from(mapa.entries())
+            .sort((a, b) => b[1] - a[1]);
+
+        // Renderizar tabela
+        lista.innerHTML = ordenado.map(([callsign, count], i) => `
+            <tr>
+                <td class="pos">${i + 1}</td>
+                <td class="callsign">${callsign}</td>
+                <td class="count">${count}</td>
+            </tr>
+        `).join('');
+
+        status.style.display = 'none';
+        tabela.style.display = 'table';
+
+    } catch (erro) {
+        console.error("Erro ao carregar dados:", erro);
+        status.innerText = "Erro ao carregar dados do POTA.";
+    }
+}
+
+// Carregar automaticamente ao abrir a página
+carregar();
+</script>
+
+</body>
+</html>
