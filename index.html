@@ -4,17 +4,16 @@
     <meta charset="UTF-8">
     <title>Top Hunters Portugal POTA</title>
     <style>
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f0f2f5; padding: 20px; }
+        body { font-family: 'Segoe UI', sans-serif; background: #f0f2f5; padding: 20px; }
         .card { max-width: 700px; margin: auto; background: white; padding: 25px; border-radius: 15px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
         h1 { color: #005ea2; text-align: center; margin-bottom: 20px; }
-        select { width: 100%; padding: 12px; margin-bottom: 20px; border-radius: 8px; border: 1px solid #ccc; font-size: 16px; background: #fff; }
+        select { width: 100%; padding: 12px; margin-bottom: 20px; border-radius: 8px; border: 1px solid #ccc; font-size: 16px; }
         table { width: 100%; border-collapse: collapse; margin-top: 10px; }
-        th { background: #005ea2; color: white; padding: 12px; text-align: left; border-radius: 4px 4px 0 0; }
+        th { background: #005ea2; color: white; padding: 12px; text-align: left; }
         td { padding: 12px; border-bottom: 1px solid #eee; }
-        .callsign { font-weight: bold; color: #d32f2f; font-family: 'Courier New', monospace; font-size: 1.1em; }
+        .callsign { font-weight: bold; color: #d32f2f; font-family: monospace; font-size: 1.1em; }
         .count { font-weight: bold; color: #2e7d32; text-align: right; }
         .loading { text-align: center; padding: 30px; color: #666; font-style: italic; }
-        .error-msg { color: #d32f2f; text-align: center; padding: 20px; font-weight: bold; }
     </style>
 </head>
 <body>
@@ -28,7 +27,7 @@
         <option value="all">Histórico Total (All-Time)</option>
     </select>
 
-    <div id="status" class="loading">A obter dados do POTA...</div>
+    <div id="status" class="loading">A obter dados em tempo real...</div>
     
     <table id="tabelaHunters" style="display:none">
         <thead>
@@ -43,7 +42,7 @@
 </div>
 
 <script>
-    // O teu Worker que já confirmamos estar ativo!
+    // O teu Worker que já confirmámos estar ativo na imagem anterior!
     const PROXY = "https://pota-proxy.henrique-chambel.workers.dev/?url=";
 
     async function carregarDados() {
@@ -53,37 +52,34 @@
         const corpo = document.getElementById('corpoTabela');
 
         status.style.display = 'block';
-        status.className = 'loading';
         status.innerText = 'A obter dados do POTA...';
         tabela.style.display = 'none';
         corpo.innerHTML = '';
 
-        // IDs DXCC: 272 (CT), 273 (CU), 256 (CT3)
+        // IDs DXCC: 272 (Portugal), 273 (Açores), 256 (Madeira)
         const dxccs = [272, 273, 256];
         let huntersUnificados = [];
 
         try {
             for (let id of dxccs) {
-                // Usando o endpoint de LEADERBOARD que é público e não pede Token
+                // Endpoint público que o site oficial usa e não pede token
                 const urlPota = `https://api.pota.app/leaderboard/hunter/${id}?year=${periodo === 'all' ? '' : periodo}`;
                 
                 const response = await fetch(PROXY + encodeURIComponent(urlPota));
                 const data = await response.json();
                 
-                // A estrutura deste endpoint é um array simples
                 if (Array.isArray(data)) {
                     huntersUnificados = huntersUnificados.concat(data);
                 }
             }
 
+            // Ordenar por número de parques (do maior para o menor)
+            huntersUnificados.sort((a, b) => b.count - a.count);
+
             if (huntersUnificados.length === 0) {
-                status.innerText = "Nenhum dado encontrado para este período.";
+                status.innerText = "Sem dados para este período.";
                 return;
             }
-
-            // Agrupar se o mesmo indicativo aparecer em regiões diferentes (raro, mas possível)
-            // e ordenar por contagem
-            huntersUnificados.sort((a, b) => b.count - a.count);
 
             // Mostrar o Top 50
             huntersUnificados.slice(0, 50).forEach((h, i) => {
@@ -98,13 +94,10 @@
             tabela.style.display = 'table';
 
         } catch (err) {
-            status.className = 'error-msg';
-            status.innerText = "Erro ao carregar dados. Verifica a ligação ao Worker.";
-            console.error(err);
+            status.innerText = "Erro ao ligar ao servidor. Verifica o link do Worker.";
         }
     }
 
-    // Iniciar automaticamente
     carregarDados();
 </script>
 </body>
