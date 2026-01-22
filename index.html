@@ -2,34 +2,38 @@
 <html lang="pt">
 <head>
     <meta charset="UTF-8">
-    <title>Top Hunters Portugal POTA</title>
+    <title>Ranking POTA Portugal</title>
     <style>
-        body { font-family: sans-serif; background: #f0f2f5; padding: 20px; }
-        .card { max-width: 600px; margin: auto; background: white; padding: 25px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
-        h1 { color: #005ea2; text-align: center; }
-        select { width: 100%; padding: 12px; margin-bottom: 20px; border-radius: 8px; border: 1px solid #ccc; font-size: 16px; }
+        body { font-family: 'Segoe UI', sans-serif; background: #f0f2f5; padding: 20px; display: flex; justify-content: center; }
+        .card { background: white; width: 100%; max-width: 650px; padding: 30px; border-radius: 15px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); }
+        h2 { color: #005ea2; text-align: center; margin-top: 0; border-bottom: 2px solid #eee; padding-bottom: 15px; }
+        .controls { display: flex; align-items: center; gap: 10px; margin-bottom: 20px; background: #f8f9fa; padding: 15px; border-radius: 8px; }
+        select { flex-grow: 1; padding: 10px; border-radius: 5px; border: 1px solid #ddd; font-size: 16px; }
         table { width: 100%; border-collapse: collapse; }
-        th { background: #005ea2; color: white; padding: 12px; text-align: left; }
+        th { background: #005ea2; color: white; padding: 12px; text-align: left; text-transform: uppercase; font-size: 13px; }
         td { padding: 12px; border-bottom: 1px solid #eee; }
-        .callsign { font-weight: bold; color: #d32f2f; font-family: monospace; }
+        .callsign { font-weight: bold; color: #d32f2f; font-family: 'Courier New', monospace; font-size: 1.1em; }
         .count { font-weight: bold; color: #2e7d32; text-align: right; }
-        .loading { text-align: center; padding: 20px; color: #666; }
+        .loading { text-align: center; color: #666; font-style: italic; padding: 40px; }
     </style>
 </head>
 <body>
 
 <div class="card">
-    <h1>🏆 Top Hunters Portugal</h1>
+    <h2>🏆 Top Hunters Portugal</h2>
     
-    <select id="periodo" onchange="carregar()">
-        <option value="2026">Ano 2026</option>
-        <option value="2025">Ano 2025</option>
-        <option value="">Histórico Total (All-Time)</option>
-    </select>
+    <div class="controls">
+        <label>Período:</label>
+        <select id="ano" onchange="obterDados()">
+            <option value="2026">Ano de 2026</option>
+            <option value="2025">Ano de 2025</option>
+            <option value="all">Histórico Total</option>
+        </select>
+    </div>
 
-    <div id="status" class="loading">A ligar ao POTA...</div>
-    
-    <table id="tabela" style="display:none">
+    <div id="loader" class="loading">A ligar ao POTA via Cloudflare...</div>
+
+    <table id="tabelaHunters" style="display:none">
         <thead>
             <tr>
                 <th>#</th>
@@ -37,66 +41,73 @@
                 <th style="text-align:right;">Parques</th>
             </tr>
         </thead>
-        <tbody id="lista"></tbody>
+        <tbody id="corpoTabela"></tbody>
     </table>
 </div>
 
 <script>
-    // Usando o teu worker que já está ativo
+    // O teu link do Worker que está a funcionar (image_054cba.png)
     const PROXY = "https://pota-proxy.henrique-chambel.workers.dev/?url=";
 
-    async function carregar() {
-        const ano = document.getElementById('periodo').value;
-        const status = document.getElementById('status');
-        const lista = document.getElementById('lista');
-        const tabela = document.getElementById('tabela');
+    async function obterDados() {
+        const anoSeleccionado = document.getElementById('ano').value;
+        const loader = document.getElementById('loader');
+        const tabela = document.getElementById('tabelaHunters');
+        const corpo = document.getElementById('corpoTabela');
 
-        status.style.display = 'block';
+        loader.style.display = 'block';
+        loader.innerHTML = "A obter dados atualizados...";
         tabela.style.display = 'none';
-        lista.innerHTML = '';
+        corpo.innerHTML = '';
 
-        // IDs DXCC: 272 (CT), 273 (CU), 256 (CT3)
-        const dxccs = [272, 273, 256];
-        let unificado = [];
+        // IDs para Portugal (272), Açores (273) e Madeira (256)
+        const regioes = [272, 273, 256];
+        let dadosUnificados = [];
 
         try {
-            for (let id of dxccs) {
-                // ESTE É O LINK CORRETO QUE NÃO PEDE TOKEN:
-                const urlPota = `https://api.pota.app/leaderboard/hunter/${id}?year=${ano}`;
+            for (let dxcc of regioes) {
+                // ESTE LINK É PÚBLICO E NÃO PEDE TOKEN
+                const anoParam = anoSeleccionado === 'all' ? '' : `?year=${anoSeleccionado}`;
+                const apiURL = `https://api.pota.app/leaderboard/hunter/${dxcc}${anoParam}`;
                 
-                const response = await fetch(PROXY + encodeURIComponent(urlPota));
-                const data = await response.json();
+                const response = await fetch(PROXY + encodeURIComponent(apiURL));
+                const json = await response.json();
                 
-                if (Array.isArray(data)) {
-                    unificado = unificado.concat(data);
+                if (Array.isArray(json)) {
+                    dadosUnificados = dadosUnificados.concat(json);
                 }
             }
 
-            // Remover duplicados (se alguém caçou em várias regiões) e somar ou ordenar
-            unificado.sort((a, b) => b.count - a.count);
+            // Ordenar por número de parques
+            dadosUnificados.sort((a, b) => b.count - a.count);
 
-            if (unificado.length === 0) {
-                status.innerText = "A API não devolveu dados. Tenta mudar o ano.";
+            if (dadosUnificados.length === 0) {
+                loader.innerHTML = "Nenhum dado encontrado para este ano.";
                 return;
             }
 
-            unificado.slice(0, 50).forEach((h, i) => {
-                lista.innerHTML += `<tr>
+            // Mostrar o Top 50
+            dadosUnificados.slice(0, 50).forEach((h, i) => {
+                const row = `<tr>
                     <td>${i + 1}</td>
                     <td class="callsign">${h.callsign}</td>
                     <td class="count">${h.count.toLocaleString()}</td>
                 </tr>`;
+                corpo.innerHTML += row;
             });
 
-            status.style.display = 'none';
+            loader.style.display = 'none';
             tabela.style.display = 'table';
 
-        } catch (e) {
-            status.innerHTML = "<b>Erro:</b> O Worker ou a API falharam.";
+        } catch (error) {
+            loader.innerHTML = "Erro: A API do POTA não respondeu corretamente.";
+            console.error(error);
         }
     }
 
-    carregar();
+    // Iniciar
+    obterDados();
 </script>
+
 </body>
 </html>
